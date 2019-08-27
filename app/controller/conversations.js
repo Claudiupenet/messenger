@@ -24,23 +24,24 @@ const add_message = (req, res) => {
                 if (error) {
                     res.status(500).json({ message: "Database error at retrieving friend " + error })
                 } else {
-                    var friendship = currentFriend.friends.find(friend => friend.friend.equals(req.user._id));
-                   if(currentFriend.newActivity.includes(friendship._id)) {
-                       currentFriend.newActivity =  currentFriend.newActivity.filter(x => !x.equals(friendship._id))
-                    }
-                    currentFriend.newActivity.push(friendship._id);
-
-                    currentFriend.save((err) => {
-                        if (error) {
-                            req.status(500).json({ message: "Error at setting seen event " + err })
+                    req.conversation.messages.push({ author: req.user._id, message: req.body.message, timestamp: Date.now() });
+                    req.conversation.unseen = currentFriend._id;
+                    req.conversation.save(e => {
+                        if (e) {
+                            res.status(500).json({ message: "Error at adding new message!" } + e)
                         } else {
-                            req.conversation.messages.push({ author: req.user._id, message: req.body.message, timestamp: Date.now() });
-                            req.conversation.unseen = currentFriend._id;
-                            req.conversation.save(e => {
-                                if (e) {
-                                    res.status(500).json({ message: "Error at adding new message!" } + e)
+                            var newMessage = req.conversation.messages[req.conversation.messages.length -1];
+                            var friendship = currentFriend.friends.find(friend => friend.friend.equals(req.user._id));
+
+                           if(currentFriend.newActivity.includes(activity => activity.conversation.equals(friendship._id))) {
+                               currentFriend.newActivity =  currentFriend.newActivity.filter(x => !x.conversation.equals(friendship._id))
+                            }
+                            currentFriend.newActivity.push({conversation: req.conversation._id, kind: 'message', message: newMessage});
+                            currentFriend.save((err) => {
+                                if (error) {
+                                    req.status(500).json({ message: "Error at adding new activity " + err })
                                 } else {
-                                    res.status(200).json({ message: "Message added!", newMessage: req.conversation.messages[req.conversation.messages.length -1] })
+                                    res.status(200).json({ message: "Message added!", newMessage })
                                 }
                             })
                         }

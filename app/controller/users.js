@@ -5,6 +5,7 @@ const nodemailer = require('nodemailer');
 const User = require('../models/user');
 const Conversation = require('../models/conversation');
 const CONFIG = require("../config");
+const secret_key = process.env.SECRET || CONFIG.JWT_SECRET_KEY;
 
 const register = (req, res) => {
 	if (req.body && req.body.email && req.body.password && req.body.firstName && req.body.lastName) {
@@ -50,7 +51,7 @@ const login = (req, res) => {
 								email: req.body.email,
 								exp: Math.floor(Date.now() / 1000) + CONFIG.JWT_EXPIRE_TIME
 							},
-								CONFIG.JWT_SECRET_KEY);
+								secret_key);
 							res.status(200).json({ message: "Successfully logged in using email and password!", token: TOKEN, userData: result})
 						} else {
 							res.status(401).json({message: "Wrong password"})
@@ -124,7 +125,7 @@ const forgot_password = (req, res) => {
 							pass: "Messenger#@!"
 						}
 					}
-					var token = JWT.sign({key: user.password, email: req.body.email}, CONFIG.JWT_SECRET_KEY);
+					var token = JWT.sign({key: user.password, email: req.body.email}, secret_key);
 
 					var mailOption = {
 						from: "claudiukambi@gmail.com",
@@ -152,7 +153,7 @@ const reset_password = (req, res) => {
 	if(!req.body.token || !req.body.password) {
 		res.status(404).json({message: "Missing token or password"})
 	} else {
-		JWT.verify(req.body.token, CONFIG.JWT_SECRET_KEY, (err, payload) => {
+		JWT.verify(req.body.token, secret_key, (err, payload) => {
 			if(err) {
 				res.status(403).json({message: "Invalid token"})
 			} else {
@@ -397,38 +398,23 @@ const get_friends_suggestions = (req, res) => {
 
 }
 
-// de optimizat - acum trimite cate un nou eveniment la fiecare cerere
 const check_activity = (req, res) => {
-	req.user.isOnline = true;
-	var user = this.online_users.find(user => user._id.equals(req.user._id));
-	if(user) {
-		user.value += 1;
-	} else {
-		this.online_users.push({_id: req.user._id, value: 0})
-	}
 	if(req.user.newActivity.length > 0) {
-		var myFriendship = req.user.friends.id(req.user.newActivity[0]).toObject();
-		Conversation.findById(myFriendship.conversation)
-		.lean()
-		.exec((error, conversation) => {
-			if(error) {
-				res.status(500).json({message: "Error at geting conversation from newActivity " + error})
-			} else {
-				var last_message = conversation.messages[conversation.messages.length -1];
-				myFriendship.conversation = conversation;
-				delete myFriendship.conversation.messages;
-				delete myFriendship.conversation.participants;
-				myFriendship.conversation.last_message = last_message;
-				req.user.newActivity.shift();
-				req.user.save()
-				res.status(200).json({message: "New activity!", conversation: myFriendship})
-			}
-		})
-		
+		var newActivity = req.user.newActivity;
+		res.status(200).json({message: "New activity!", newActivity})
+		req.user.newActivity= [];
+		req.user.save()
 		
 	} else {
-		req.user.save();
 		res.sendStatus(204);
+		var user = this.online_users.find(user => user._id.equals(req.user._id));
+		if(user) {
+			user.value = 0;
+		} else {
+			this.online_users.push({_id: req.user._id, value: 0})
+			req.user.isOnline = true;
+			req.user.save();
+		}
 	}
 }
 
@@ -452,7 +438,7 @@ const extractDataMiddleware = (req, res, next) => {
 
 const authMiddleware = (req, res, next) => {
 	if (req.headers["token"]) {
-		JWT.verify(req.headers["token"], CONFIG.JWT_SECRET_KEY, (err, payload) => {
+		JWT.verify(req.headers["token"], secret_key, (err, payload) => {
 			if (err) {
 				res.status(403).json({ message: "Invalid token" })
 			} else {
@@ -467,24 +453,17 @@ const authMiddleware = (req, res, next) => {
 
 this.online_users = [];
 
-const check_online = () => {
-	User.find({isOnline: true}, "_id", (error, onlineUsers) => {
-		if(error) {
-			console.log(error)
-		}
-		onlineUsers.map( user => {
-			if(!this.online_users.find( onlineUser => onlineUser._id.equals(user._id))) {
-
-				this.online_users.push({_id: user._id, value: 0})
-			}
-		})
-	})
-} 
-
 const isStillOnline = (online_users = this.online_users) => {
 	online_users.map(user => {
-		if(user.value < -4) {
-			User.findByIdAndUpdate(user._id, {'$set': {'isOnline': false}}, (error) => {
+		 if(user.value < -4) {
+			User.findById(user._id, 'friends isOnline')
+			.populate('friends.friend', 'status')
+			.then(user => {
+				user.isOnline = false;
+				user.save();
+			})
+			.catch(error => {
+
 				if(error) {
 					console.log("is error" + error)
 				} 
@@ -498,8 +477,9 @@ const isStillOnline = (online_users = this.online_users) => {
 
 }
 
-setInterval(check_online, 10000)
+//setInterval(check_online, 10000)
 setInterval(isStillOnline, 1000)
+
 
 const test = (req, res) => {
 

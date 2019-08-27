@@ -1,9 +1,11 @@
 const mongoose = require('mongoose');
 const CONFIG = require('../config');
 var ObjectId = mongoose.Schema.Types.ObjectId;
+const mongo_uri = process.env.MONGODB_URI || CONFIG.DB_ADDRESS;
+
 
 //Se face conexiunea la baza de date cu mongoose
-mongoose.connect(CONFIG.DB_ADDRESS, { useNewUrlParser: true })
+mongoose.connect(mongo_uri, { useNewUrlParser: true })
 	.then(data => {
 		console.log("Connected to DB")
 	})
@@ -27,7 +29,14 @@ var UserSchema = new Schema({
 	phone: { type: String, trim: true },
 	age: { type: Number, min: 16, max: 120 },
 	sex: { type: String, enum: ["Male", "Female", null], trim: true },
-	newActivity: [{type: Schema.Types.ObjectId, ref: 'Conversation', select: false}],
+	newActivity: [{conversation: {type: Schema.Types.ObjectId, ref: 'Conversation'},
+					kind: String,
+					message: {_id: {type: Schema.Types.ObjectId},
+							author: {type: Schema.Types.ObjectId, ref: 'User'},
+							message: String,
+							timestamp: Date},
+					_id: false
+				}],
 	isOnline: {type: Boolean, default: false},
 	friends: [	{friend: {type: Schema.Types.ObjectId, ref: 'User'},
 				status: Number,
