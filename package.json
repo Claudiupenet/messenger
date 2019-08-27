@@ -23,6 +23,7 @@
     "mongodb": "^3.2.4",
     "mongoose": "^5.5.9",
     "nodemailer": "^6.2.1",
+    "nodemon": "^1.19.1",
     "path": "^0.12.7"
   }
 }
