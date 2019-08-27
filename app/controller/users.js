@@ -122,7 +122,7 @@ const forgot_password = (req, res) => {
 						secure: true,
 						auth: {
 							user: "claudiukambi@gmail.com",
-							pass: "Messenger#@!"
+							pass: secret
 						}
 					}
 					var token = JWT.sign({key: user.password, email: req.body.email}, secret_key);
